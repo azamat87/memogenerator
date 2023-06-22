@@ -1,13 +1,13 @@
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
-import 'package:memogenerator/blocs/main_bloc.dart';
-import 'package:memogenerator/pages/create_meme_page.dart';
+import 'package:memogenerator/data/models/meme.dart';
+import 'package:memogenerator/presentation/main/main_bloc.dart';
+import 'package:memogenerator/presentation/create_meme/create_meme_page.dart';
 import 'package:memogenerator/resources/app_colors.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class MainPage extends StatefulWidget {
-
   MainPage({Key? key}) : super(key: key);
 
   @override
@@ -36,10 +36,15 @@ class _MainPageState extends State<MainPage> {
             centerTitle: true,
           ),
           floatingActionButton: FloatingActionButton.extended(
-              onPressed: () {
+              onPressed: () async {
+                final selectedMemePath = await bloc.selectMeme();
+                if (selectedMemePath == null) {
+                  return;
+                }
                 Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => CreateMemePage()
-                ));
+                    builder: (_) => CreateMemePage(
+                          selectedMemePath: selectedMemePath,
+                        )));
               },
               backgroundColor: AppColors.fuchsia,
               icon: Icon(
@@ -67,8 +72,33 @@ class MainPageContent extends StatefulWidget {
 class _MainPageContentState extends State<MainPageContent> {
   @override
   Widget build(BuildContext context) {
+    final bloc = Provider.of<MainBloc>(context, listen: false);
     return Center(
-      child: Text("Center"),
+      child: StreamBuilder<List<Meme>>(
+        stream: bloc.observeMemes(),
+        initialData: <Meme>[],
+        builder: (context, snapshot) {
+          final items = snapshot.hasData ? snapshot.data! : <Meme>[];
+
+          return ListView(
+            children: items
+                .map((item) => GestureDetector(
+                      onTap: () {
+                        Navigator.of(context)
+                            .push(MaterialPageRoute(builder: (context) {
+                          return CreateMemePage(id: item.id);
+                        }));
+                      },
+                      child: Container(
+                          height: 48,
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          alignment: Alignment.centerLeft,
+                          child: Text(item.id)),
+                    ))
+                .toList(),
+          );
+        },
+      ),
     );
   }
 }

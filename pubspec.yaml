@@ -17,14 +17,17 @@ dependencies:
   json_annotation: ^4.8.1
   shared_preferences: ^2.1.2
   uuid: ^3.0.7
+  equatable: ^2.0.5
+  image_picker: ^0.8.9
+  path_provider: ^2.0.15
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
+  json_serializable: ^6.7.0
+  build_runner: ^2.4.5
 #  network_image_mock: ^2.1.1
-#  json_serializable: ^6.7.0
-#  build_runner: ^2.4.5
 #  golden_toolkit: ^0.15.0
 
 dependency_overrides:
