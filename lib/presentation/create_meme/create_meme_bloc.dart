@@ -6,6 +6,7 @@ import 'package:memogenerator/data/models/meme.dart';
 import 'package:memogenerator/data/models/position.dart';
 import 'package:memogenerator/data/models/text_with_position.dart';
 import 'package:memogenerator/data/repositories/memes_repository.dart';
+import 'package:memogenerator/domain/interactors/save_meme_interactor.dart';
 import 'package:memogenerator/presentation/create_meme/models/meme_text_offset.dart';
 import 'package:memogenerator/presentation/create_meme/models/meme_text.dart';
 import 'package:memogenerator/presentation/create_meme/models/meme_text_with_offset.dart';
@@ -19,9 +20,9 @@ class CreateMemeBloc {
   final memeTextSubject = BehaviorSubject<List<MemeText>>.seeded(<MemeText>[]);
   final selectedMemeTextSubject = BehaviorSubject<MemeText?>.seeded(null);
   final memeTextOffsetsSubject =
-  BehaviorSubject<List<MemeTextOffset>>.seeded(<MemeTextOffset>[]);
+      BehaviorSubject<List<MemeTextOffset>>.seeded(<MemeTextOffset>[]);
   final newMemeTextOffsetSubject =
-  BehaviorSubject<MemeTextOffset?>.seeded(null);
+      BehaviorSubject<MemeTextOffset?>.seeded(null);
   final memePathSubject = BehaviorSubject<String?>.seeded(null);
 
   StreamSubscription<MemeTextOffset?>? newMemeTextOffsetSubscription;
@@ -31,7 +32,8 @@ class CreateMemeBloc {
   final String id;
   final String? selectedMemePath;
 
-  CreateMemeBloc({final String? id, final this.selectedMemePath}) : this.id = id ?? Uuid().v4() {
+  CreateMemeBloc({final String? id, final this.selectedMemePath})
+      : this.id = id ?? Uuid().v4() {
     memePathSubject.add(selectedMemePath);
     _subscribeToNewMemeTextOffset();
     _subscribeToExistentMeme();
@@ -42,7 +44,7 @@ class CreateMemeBloc {
     final memeTextOffsets = memeTextOffsetsSubject.value;
     final textsWithPosition = memeTexts.map((memeText) {
       final memeTextPosition =
-      memeTextOffsets.firstWhereOrNull((memeTextOffset) {
+          memeTextOffsets.firstWhereOrNull((memeTextOffset) {
         return memeTextOffset.id == memeText.id;
       });
       final position = Position(
@@ -52,32 +54,15 @@ class CreateMemeBloc {
           id: memeText.id, text: memeText.text, position: position);
     }).toList();
 
-    saveMemeSubscription = _saveMemeInternal(textsWithPosition)
+    saveMemeSubscription = SaveMemeInteractor.getInstance()
+        .saveMeme(
+            id: id, textWithPositions: textsWithPosition, imagePath: memePathSubject.value)
         .asStream()
         .listen((event) {
       print("meme save");
     },
-        onError: (error, stackTrace) =>
-            print("Error in saveMemeSubs $error $stackTrace"));
-  }
-
-  Future<bool> _saveMemeInternal(final List<TextWithPosition> textsWithPosition) async {
-    final imagePath = memePathSubject.value;
-    if (imagePath == null) {
-      final meme = Meme(id: id, texts: textsWithPosition);
-      return MemesRepository.getInstance().addToMemes(meme);
-    }
-
-    final docsPath = await getApplicationDocumentsDirectory();
-    final memePath = "${docsPath.absolute.path}${Platform.pathSeparator}memes";
-    await Directory(memePath).create(recursive: true);
-    final imageName = imagePath.split(Platform.pathSeparator).last;
-    final newImagePath = "$memePath${Platform.pathSeparator}$imageName";
-    final tempFile = File(imagePath);
-    await tempFile.copy(newImagePath);
-
-    final meme = Meme(id: id, texts: textsWithPosition, memePath: newImagePath);
-    return MemesRepository.getInstance().addToMemes(meme);
+            onError: (error, stackTrace) =>
+                print("Error in saveMemeSubs $error $stackTrace"));
   }
 
   void _subscribeToNewMemeTextOffset() {
@@ -88,8 +73,7 @@ class CreateMemeBloc {
         _changeMemeTextOffsetInternal(newMemeTextOffset);
       }
     },
-        onError: (error, stackTrace) =>
-            print(
+            onError: (error, stackTrace) => print(
                 "Error in newMemeTextOffsetSubscription $error $stackTrace"));
   }
 
@@ -100,7 +84,7 @@ class CreateMemeBloc {
   void _changeMemeTextOffsetInternal(final MemeTextOffset newMemeTextOffset) {
     final copiedMemeTextOffsets = [...memeTextOffsetsSubject.value];
     final currentMemeTextOffset = copiedMemeTextOffsets.firstWhereOrNull(
-            (memeTextOffset) => memeTextOffset.id == newMemeTextOffset.id);
+        (memeTextOffset) => memeTextOffset.id == newMemeTextOffset.id);
     if (currentMemeTextOffset != null) {
       copiedMemeTextOffsets.remove(currentMemeTextOffset);
     }
@@ -127,7 +111,7 @@ class CreateMemeBloc {
 
   void selectMemeText(final String id) {
     final foundMemeText =
-    memeTextSubject.value.firstWhereOrNull((memeText) => memeText.id == id);
+        memeTextSubject.value.firstWhereOrNull((memeText) => memeText.id == id);
     selectedMemeTextSubject.add(foundMemeText);
   }
 
@@ -144,20 +128,22 @@ class CreateMemeBloc {
         }).toList();
       });
 
-  Stream<List<MemeText>> observeMemeTexts() =>
-      memeTextSubject
-          .distinct((prev, next) => ListEquality().equals(prev, next));
+  Stream<List<MemeText>> observeMemeTexts() => memeTextSubject
+      .distinct((prev, next) => ListEquality().equals(prev, next));
 
   Stream<List<MemeTextWithOffset>> observeMemeTextWithOffset() {
-    return Rx.combineLatest2<List<MemeText>,
-        List<MemeTextOffset>,
-        List<MemeTextWithOffset>>(
-        observeMemeTexts(), memeTextOffsetsSubject.distinct(), (memeTexts, memeTextOffsets) {
+    return Rx.combineLatest2<List<MemeText>, List<MemeTextOffset>,
+            List<MemeTextWithOffset>>(
+        observeMemeTexts(), memeTextOffsetsSubject.distinct(),
+        (memeTexts, memeTextOffsets) {
       return memeTexts.map((memeText) {
-        final memeTextOffset = memeTextOffsets.firstWhereOrNull((element){
-            return element.id == memeText.id;
+        final memeTextOffset = memeTextOffsets.firstWhereOrNull((element) {
+          return element.id == memeText.id;
         });
-        return MemeTextWithOffset(id: memeText.id, text: memeText.text, offset: memeTextOffset?.offset);
+        return MemeTextWithOffset(
+            id: memeText.id,
+            text: memeText.text,
+            offset: memeTextOffset?.offset);
       }).toList();
     });
   }
@@ -179,7 +165,6 @@ class CreateMemeBloc {
   }
 
   void _subscribeToExistentMeme() {
-
     existentMemeSubscription = MemesRepository.getInstance()
         .getMeme(this.id)
         .asStream()
@@ -201,7 +186,7 @@ class CreateMemeBloc {
       memeTextOffsetsSubject.add(memeTextOffsets);
       memePathSubject.add(meme.memePath);
     },
-        onError: (error, stackTrace) =>
-            print("Error in saveMemeSubs $error $stackTrace"));
+            onError: (error, stackTrace) =>
+                print("Error in saveMemeSubs $error $stackTrace"));
   }
 }
