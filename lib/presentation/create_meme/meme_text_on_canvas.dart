@@ -9,14 +9,17 @@ class MemeTextOnCanvas extends StatelessWidget {
   final String text;
   final double fontSize;
   final Color color;
+  final FontWeight fontWeight;
 
-  const MemeTextOnCanvas({Key? key,
-    required this.parentConstraints,
-    required this.selected,
-    required this.padding,
-    required this.text,
-    required this.fontSize,
-    required this.color})
+  const MemeTextOnCanvas(
+      {Key? key,
+      required this.parentConstraints,
+      required this.selected,
+      required this.padding,
+      required this.text,
+      required this.fontSize,
+      required this.color,
+      required this.fontWeight})
       : super(key: key);
 
   @override
@@ -34,7 +37,7 @@ class MemeTextOnCanvas extends StatelessWidget {
       child: Text(
         text,
         textAlign: TextAlign.center,
-        style: TextStyle(color: color, fontSize: fontSize),
+        style: TextStyle(color: color, fontSize: fontSize, fontWeight: fontWeight),
       ),
     );
   }

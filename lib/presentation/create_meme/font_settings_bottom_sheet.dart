@@ -19,19 +19,21 @@ class FontSettingBottomSheet extends StatefulWidget {
 class _FontSettingBottomSheetState extends State<FontSettingBottomSheet> {
   late double fontSize;
   late Color color;
+  late FontWeight fontWeight;
 
   @override
   void initState() {
     super.initState();
       fontSize = widget.memeText.fontSize;
       color = widget.memeText.color;
+      fontWeight = widget.memeText.fontWeight;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      child: Column(
+    final bloc = Provider.of<CreateMemeBloc>(context, listen: false);
+
+    return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(
@@ -56,6 +58,7 @@ class _FontSettingBottomSheetState extends State<FontSettingBottomSheet> {
             text: widget.memeText.text,
             fontSize: fontSize,
             color: color,
+            fontWeight: fontWeight,
           ),
           const SizedBox(
             height: 48,
@@ -77,32 +80,45 @@ class _FontSettingBottomSheetState extends State<FontSettingBottomSheet> {
             });
           }),
           const SizedBox(
+            height: 16,
+          ),
+          FontWeightSlider(
+            initialFontWeight: fontWeight,
+            changeFontWeight: (value) {
+              setState(() {
+                fontWeight = value;
+              });
+            },
+          ),
+          const SizedBox(
             height: 36,
           ),
           Align(
             alignment: Alignment.centerRight,
-            child: Buttons(color: color, fontSize: fontSize, textId: widget.memeText.id,),
+            child: Buttons(textId: widget.memeText.id,
+            onPositiveButton: () {
+              bloc.changeFontSettings(widget.memeText.id, color, fontSize, fontWeight);
+            }),
           ),
           const SizedBox(
             height: 48,
           ),
         ],
-      ),
     );
   }
 }
 
 class Buttons extends StatelessWidget {
 
-  final Color color;
-  final double fontSize;
   final String textId;
+  final VoidCallback onPositiveButton;
 
-  const Buttons({Key? key, required this.color, required this.fontSize, required this.textId}) : super(key: key);
+  const Buttons({Key? key,
+    required this.onPositiveButton,
+    required this.textId}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final bloc = Provider.of<CreateMemeBloc>(context, listen: false);
     return Row(
       children: [
         AppButton(onTap: () {
@@ -112,7 +128,7 @@ class Buttons extends StatelessWidget {
           width: 24,
         ),
         AppButton(onTap: () {
-          bloc.changeFontSettings(textId, color, fontSize);
+          onPositiveButton();
           Navigator.of(context).pop();
         }, text: "Сохранить"),
         const SizedBox(
@@ -229,6 +245,68 @@ class _FontSizeSliderState extends State<FontSizeSlider> {
                 setState(() {
                   fontSize = value;
                   widget.changeFontSize(value);
+                });
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class FontWeightSlider extends StatefulWidget {
+  const FontWeightSlider({Key? key, required this.changeFontWeight, required this.initialFontWeight})
+      : super(key: key);
+
+  final ValueChanged<FontWeight> changeFontWeight;
+  final FontWeight initialFontWeight;
+
+  @override
+  State<FontWeightSlider> createState() => _FontWeightSliderState();
+}
+
+class _FontWeightSliderState extends State<FontWeightSlider> {
+  late FontWeight fontWeight;
+
+  @override
+  void initState() {
+    super.initState();
+    fontWeight = widget.initialFontWeight;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const SizedBox(
+          width: 16,
+        ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(
+            "Font Weight",
+            style: TextStyle(fontSize: 20, color: AppColors.darkGrey),
+          ),
+        ),
+        Expanded(
+          child: SliderTheme(
+            data: SliderThemeData(
+              activeTrackColor: AppColors.fuchsia,
+              inactiveTrackColor: AppColors.fuchsia38,
+              thumbColor: AppColors.fuchsia,
+              inactiveTickMarkColor: AppColors.fuchsia,
+              valueIndicatorColor: AppColors.fuchsia,
+            ),
+            child: Slider(
+              min: FontWeight.w100.index.toDouble(),
+              max: FontWeight.w900.index.toDouble(),
+              divisions: FontWeight.w900.index - FontWeight.w100.index,
+              value: fontWeight.index.toDouble(),
+              onChanged: (double value) {
+                setState(() {
+                  fontWeight = FontWeight.values.firstWhere((element) => element.index == value.toInt());
+                  widget.changeFontWeight(fontWeight);
                 });
               },
             ),

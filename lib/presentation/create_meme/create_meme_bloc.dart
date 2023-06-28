@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:memogenerator/data/models/meme.dart';
 import 'package:memogenerator/data/models/position.dart';
 import 'package:memogenerator/data/models/text_with_position.dart';
@@ -49,20 +50,22 @@ class CreateMemeBloc {
     shareMemeSubscription = ScreenshotInteractor.getInstance()
         .shareScreenshot(screenshotControllerSubject.value.capture())
         .asStream()
-        .listen((event) {
-
-    }, onError: (error, stackTrace) =>
-        print("Error in shareMemeSubs $error $stackTrace"));
+        .listen((event) {},
+            onError: (error, stackTrace) =>
+                print("Error in shareMemeSubs $error $stackTrace"));
   }
 
-  void changeFontSettings(final String textId, final Color color, final double fontSize) {
+  void changeFontSettings(final String textId, final Color color,
+      final double fontSize, final FontWeight fontWeight) {
     final copiedList = [...memeTextSubject.value];
-    final oldMemeText = copiedList.firstWhereOrNull((memeText) => memeText.id == textId);
+    final oldMemeText =
+        copiedList.firstWhereOrNull((memeText) => memeText.id == textId);
     if (oldMemeText == null) {
       return;
     }
     copiedList.remove(oldMemeText);
-    copiedList.add(oldMemeText.copyWithChangedFontSettings(color, fontSize));
+    copiedList.add(
+        oldMemeText.copyWithChangedFontSettings(color, fontSize, fontWeight));
     memeTextSubject.add(copiedList);
   }
 
@@ -78,7 +81,12 @@ class CreateMemeBloc {
           top: memeTextPosition?.offset.dy ?? 0,
           left: memeTextPosition?.offset.dx ?? 0);
       return TextWithPosition(
-          id: memeText.id, text: memeText.text, position: position, fontSize: memeText.fontSize, color: memeText.color);
+          id: memeText.id,
+          text: memeText.text,
+          position: position,
+          fontSize: memeText.fontSize,
+          color: memeText.color,
+          fontWeight: memeText.fontWeight);
     }).toList();
 
     saveMemeSubscription = SaveMemeInteractor.getInstance()
@@ -88,9 +96,7 @@ class CreateMemeBloc {
             screenshotController: screenshotControllerSubject.value,
             imagePath: memePathSubject.value)
         .asStream()
-        .listen((event) {
-      print("meme save");
-    },
+        .listen((event) {},
             onError: (error, stackTrace) =>
                 print("Error in saveMemeSubs $error $stackTrace"));
   }
@@ -172,8 +178,7 @@ class CreateMemeBloc {
           return element.id == memeText.id;
         });
         return MemeTextWithOffset(
-            memeText: memeText,
-            offset: memeTextOffset?.offset);
+            memeText: memeText, offset: memeTextOffset?.offset);
       }).toList();
     });
   }
@@ -233,5 +238,32 @@ class CreateMemeBloc {
     },
             onError: (error, stackTrace) =>
                 print("Error in saveMemeSubs $error $stackTrace"));
+  }
+
+  void deleteMemeText(final String id) {
+    final updatedMemeTexts = [...memeTextSubject.value];
+    updatedMemeTexts.removeWhere((element) => element.id == id);
+    memeTextSubject.add(updatedMemeTexts);
+  }
+
+  Future<bool> isSaved() async {
+    final savedMeme = await MemesRepository.getInstance().getMeme(id);
+    if (savedMeme == null) {
+      return false;
+    }
+    final memeTexts = savedMeme.texts.map((textWithPosition) {
+      return MemeText.createFromTextWithPosition(textWithPosition);
+    }).toList();
+
+    final memeTextOffsets = savedMeme.texts.map((textWithPosition) {
+      return MemeTextOffset(
+          id: textWithPosition.id,
+          offset: Offset(
+              textWithPosition.position.left, textWithPosition.position.top));
+    }).toList();
+    return DeepCollectionEquality.unordered()
+            .equals(memeTexts, memeTextSubject.value) &&
+        DeepCollectionEquality.unordered()
+            .equals(memeTextOffsets, memeTextOffsetsSubject.value);
   }
 }
