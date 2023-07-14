@@ -1,9 +1,11 @@
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:memogenerator/data/models/meme.dart';
+import 'package:memogenerator/presentation/easter_egg/easter_egg_page.dart';
 import 'package:memogenerator/presentation/main/main_bloc.dart';
 import 'package:memogenerator/presentation/create_meme/create_meme_page.dart';
 import 'package:memogenerator/presentation/main/memes_with_docs_path.dart';
+import 'package:memogenerator/presentation/main/models/template_full.dart';
 import 'package:memogenerator/presentation/widgets/app_button.dart';
 import 'package:memogenerator/resources/app_colors.dart';
 import 'package:provider/provider.dart';
@@ -35,33 +37,40 @@ class _MainPageState extends State<MainPage> {
           final goBack = await showConfirmationExitDialog(context);
           return goBack ?? false;
         },
-        child: Scaffold(
-            appBar: AppBar(
-              backgroundColor: AppColors.lemon,
-              foregroundColor: AppColors.darkGrey,
-              title: Text("Мемогенератор",
-                  style: GoogleFonts.seymourOne(fontSize: 24)),
-              centerTitle: true,
-            ),
-            floatingActionButton: FloatingActionButton.extended(
-                onPressed: () async {
-                  final selectedMemePath = await bloc.selectMeme();
-                  if (selectedMemePath == null) {
-                    return;
-                  }
-                  Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => CreateMemePage(
-                            selectedMemePath: selectedMemePath,
-                          )));
-                },
-                backgroundColor: AppColors.fuchsia,
-                icon: Icon(
-                  Icons.add,
-                  color: Colors.white,
+        child: DefaultTabController(
+          length: 2,
+          child: Scaffold(
+              appBar: AppBar(
+                backgroundColor: AppColors.lemon,
+                foregroundColor: AppColors.darkGrey,
+                title: GestureDetector(
+                  onLongPress: () {
+                    Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => EasterEggPage()));
+                  },
+                  child: Text("Мемогенератор",
+                      style: GoogleFonts.seymourOne(fontSize: 24)),
                 ),
-                label: Text("Создать")),
-            backgroundColor: Colors.white,
-            body: SafeArea(child: MainPageContent())),
+                centerTitle: true,
+                bottom: TabBar(
+                  labelColor: AppColors.darkGrey,
+                  indicatorColor: AppColors.fuchsia,
+                  indicatorWeight: 3,
+                  tabs: [
+                    Tab(text: "Созданные".toUpperCase()),
+                    Tab(text: "Шаблоны".toUpperCase()),
+                  ],
+                ),
+              ),
+              floatingActionButton: CreateMemeFab(),
+              backgroundColor: Colors.white,
+              body: TabBarView(
+                children: [
+                  SafeArea(child: CreatedMemesGrid()),
+                  SafeArea(child: TemplatesGrid()),
+                ],
+              )),
+        ),
       ),
     );
   }
@@ -97,18 +106,42 @@ class _MainPageState extends State<MainPage> {
   }
 }
 
-class MainPageContent extends StatefulWidget {
+class CreateMemeFab extends StatelessWidget {
+  const CreateMemeFab({Key? key}) : super(key: key);
+
   @override
-  State<MainPageContent> createState() => _MainPageContentState();
+  Widget build(BuildContext context) {
+
+    final bloc = Provider.of<MainBloc>(context, listen: false);
+    return FloatingActionButton.extended(
+        onPressed: () async {
+          final selectedMemePath = await bloc.selectMeme();
+          if (selectedMemePath == null) {
+            return;
+          }
+          Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => CreateMemePage(
+                selectedMemePath: selectedMemePath,
+              )));
+        },
+        backgroundColor: AppColors.fuchsia,
+        icon: Icon(
+          Icons.add,
+          color: Colors.white,
+        ),
+        label: Text("Создать"));
+  }
 }
 
-class _MainPageContentState extends State<MainPageContent> {
+
+class CreatedMemesGrid extends StatelessWidget {
   @override
+
   Widget build(BuildContext context) {
     final bloc = Provider.of<MainBloc>(context, listen: false);
     return Center(
       child: StreamBuilder<MemesWithDocsPath>(
-        stream: bloc.observeMemes(),
+        stream: bloc.observeMemesWithDocsPath(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const SizedBox.shrink();
@@ -121,7 +154,7 @@ class _MainPageContentState extends State<MainPageContent> {
             mainAxisSpacing: 8,
             crossAxisSpacing: 8,
             children: items
-                .map((item) => GridItem(
+                .map((item) => MemeGridItem(
                       item: item,
                       docsPath: docsPath,
                     ))
@@ -133,11 +166,43 @@ class _MainPageContentState extends State<MainPageContent> {
   }
 }
 
-class GridItem extends StatelessWidget {
+class TemplatesGrid extends StatelessWidget {
+
+
+  @override
+
+  Widget build(BuildContext context) {
+    final bloc = Provider.of<MainBloc>(context, listen: false);
+    return Center(
+      child: StreamBuilder<List<TemplateFull>>(
+        stream: bloc.observeTemplates(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const SizedBox.shrink();
+          }
+          final templates = snapshot.requireData;
+
+          return GridView.extent(
+            maxCrossAxisExtent: 180,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            children: templates
+                .map((template) => TemplateGridItem(
+              template: template
+            ))
+                .toList(),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class MemeGridItem extends StatelessWidget {
   final Meme item;
   final String docsPath;
 
-  const GridItem({Key? key, required this.item, required this.docsPath})
+  const MemeGridItem({Key? key, required this.item, required this.docsPath})
       : super(key: key);
 
   @override
@@ -158,6 +223,34 @@ class GridItem extends StatelessWidget {
               ? Image.file(
                   File("$docsPath${Platform.pathSeparator}${item.id}.png"))
               : Text(item.id)),
+    );
+  }
+}
+
+class TemplateGridItem extends StatelessWidget {
+  final TemplateFull template;
+
+  const TemplateGridItem({Key? key, required this.template})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final imageFile = File(template.fullImagePath);
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => CreateMemePage(
+              selectedMemePath: template.fullImagePath,
+            )));
+      },
+      child: Container(
+          alignment: Alignment.centerLeft,
+          decoration: BoxDecoration(
+              border: Border.all(color: AppColors.darkGrey, width: 1)),
+          child: imageFile.existsSync()
+              ? Image.file(imageFile)
+              : Text(template.id)),
     );
   }
 }
