@@ -1,11 +1,12 @@
 
 import 'dart:convert';
 import 'package:memogenerator/data/models/template.dart';
+import 'package:memogenerator/data/repositories/list_with_ids_reactive_repository.dart';
 import 'package:memogenerator/data/shared_preference_data.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:collection/collection.dart';
 
-class TemplatesRepository {
+class TemplatesRepository extends ListWithIdsReactiveRepository<Template>{
   final update = PublishSubject<Null>();
   final SharedPreferenceData spData;
 
@@ -17,56 +18,28 @@ class TemplatesRepository {
 
   TemplatesRepository._internal(this.spData);
 
-  Future<bool> addToTemplates(final Template newTemplate) async {
-    final templates = await getTemplates();
-    final templateIndex = templates.indexWhere((element) => newTemplate.id == element.id);
-    if (templateIndex == -1) {
-      templates.add(newTemplate);
-    } else {
-      templates.removeAt(templateIndex);
-      templates.insert(templateIndex, newTemplate);
-    }
-    return _setTemplates(templates);
+  @override
+  Template convertFromString(String rawItem) {
+    return Template.fromJson(json.decode(rawItem));
   }
 
-  Future<bool> removeFromTemplates(final String id) async {
-    final templates = await getTemplates();
-    templates.removeWhere((element) => element.id == id);
-
-    return _setTemplates(templates);
+  @override
+  String convertToString(Template item) {
+    return json.encode(item.toJson());
   }
 
-  Future<Template?> getTemplate(final String id) async {
-    final templates = await getTemplates();
-
-    return templates.firstWhereOrNull((template) => template.id == id);
+  @override
+  dynamic getId(Template item) {
+    return item.id;
   }
 
-  Future<List<Template>> getTemplates() async {
-    final rawTemplates = await spData.getTemplates();
-    return rawTemplates
-        .map((rawTemplate) => Template.fromJson(json.decode(rawTemplate)))
-        .toList();
-  }
-
-  Stream<List<Template>> observeTemplates() async* {
-    yield await getTemplates();
-    await for (final _ in update) {
-      yield await getTemplates();
-    }
-  }
-
-  Future<bool> _setTemplates(final List<Template> templates) async {
-    final rawTemplates = templates.map((e) => json.encode(e.toJson())).toList();
-    return _setRawTemplates(rawTemplates);
-  }
-
-  Future<bool> _setRawTemplates(List<String> rawTemplates) async {
-    update.add(null);
-    return spData.setTemplates(rawTemplates);
-  }
-
-  Future<List<String>> _getRawTemplates() async {
+  @override
+  Future<List<String>> getRawData() {
     return spData.getTemplates();
+  }
+
+  @override
+  Future<bool> saveRawData(List<String> items) {
+    return spData.setTemplates(items);
   }
 }

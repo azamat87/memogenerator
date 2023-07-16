@@ -30,7 +30,7 @@ class SaveTemplateInteractor {
         .copyUniqueFile(directoryWithFiles: templatesPathName,
         filePath: imagePath);
     final template = Template(id: Uuid().v4(), imageUrl: newImagePath);
-    return TemplatesRepository.getInstance().addToTemplates(template);
+    return TemplatesRepository.getInstance().addItemOrReplaceById(template);
   }
 
 }
